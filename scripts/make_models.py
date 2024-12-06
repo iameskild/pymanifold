@@ -7,6 +7,7 @@ import logging
 import tempfile
 from typing import Dict, Optional
 import sys
+import os
 
 import mistune
 
@@ -14,13 +15,17 @@ SCHEMA_INPUT = Path("schemas")
 PYDANTIC_OUTPUT = Path("pymanifold/models")
 API_DOC_PATH = Path("docs/docs/api.md")
 GENERATED_SCHEMA_SCRIPT = Path("genJsonSchema.ts")
+REPO_ROOT = Path(__file__).parent.parent
 
 DEPRECATED = "deprecated"
 MANIFOLD_REPO_URL = "https://github.com/iameskild/manifold.git"
-REPO_ROOT = Path(__file__).parent.parent
+
+DEBUG = os.getenv("DEBUG", "").lower() == "true"
+
 
 logging.basicConfig(
-    level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s"
+    level=logging.DEBUG if DEBUG else logging.INFO,
+    format="%(asctime)s - %(levelname)s - %(message)s",
 )
 logger = logging.getLogger(__name__)
 
@@ -114,9 +119,15 @@ def clone_manifold(temp_dir: Path) -> None:
 
     logger.info("Initializing sparse clone of manifold repository...")
 
-    run_command(["git", "init"], cwd=manifold_dir)
-    run_command(["git", "remote", "add", "origin", MANIFOLD_REPO_URL], cwd=manifold_dir)
-    run_command(["git", "config", "core.sparseCheckout", "true"], cwd=manifold_dir)
+    run_command(["git", "init"], cwd=manifold_dir, debug=DEBUG)
+    run_command(
+        ["git", "remote", "add", "origin", MANIFOLD_REPO_URL],
+        cwd=manifold_dir,
+        debug=DEBUG,
+    )
+    run_command(
+        ["git", "config", "core.sparseCheckout", "true"], cwd=manifold_dir, debug=DEBUG
+    )
 
     sparse_checkout_path = manifold_dir / ".git/info/sparse-checkout"
     sparse_checkout_path.parent.mkdir(parents=True, exist_ok=True)
@@ -126,7 +137,7 @@ def clone_manifold(temp_dir: Path) -> None:
         f.write("!twitch-bot/common\n")
 
     logger.info("Fetching required files...")
-    run_command(["git", "pull", "origin", "main"], cwd=manifold_dir)
+    run_command(["git", "pull", "origin", "main"], cwd=manifold_dir, debug=DEBUG)
     logger.info("Successfully cloned manifold repository")
 
 
@@ -144,12 +155,14 @@ def create_json_schema(temp_dir: Path) -> None:
     shutil.copy(script_source, script_dest)
 
     logger.info("Installing required packages...")
-    run_command(["yarn", "install"], cwd=common_dir)
-    run_command(["yarn", "add", "typescript"], cwd=common_dir)
-    run_command(["yarn", "add", "ts-node"], cwd=common_dir)
+    run_command(["yarn", "install"], cwd=common_dir, debug=DEBUG)
+    run_command(["yarn", "add", "typescript"], cwd=common_dir, debug=DEBUG)
+    run_command(["yarn", "add", "ts-node"], cwd=common_dir, debug=DEBUG)
 
     logger.info("Generating JSON schema...")
-    run_command(["npx", "ts-node", GENERATED_SCHEMA_SCRIPT], cwd=common_dir)
+    run_command(
+        ["npx", "ts-node", GENERATED_SCHEMA_SCRIPT], cwd=common_dir, debug=DEBUG
+    )
     logger.info("Successfully generated JSON schema")
 
 
@@ -202,10 +215,18 @@ def _get_endpoints_from_api_doc(temp_dir: Path) -> Dict[str, Dict[str, str]]:
     return endpoints
 
 
-def run_command(cmd: list[str], cwd: Optional[str | Path] = None) -> str:
-    """Run a command and return its output."""
+def run_command(
+    cmd: list[str], cwd: Optional[str | Path] = None, debug: bool = False
+) -> str:
+    """
+    Run a command and return its output.
+
+    Args:
+        cmd: Command to run as list of strings
+        cwd: Working directory for the command
+        debug: If True, print command output to stdout/stderr
+    """
     try:
-        # Use subprocess.Popen to get real-time output
         process = subprocess.Popen(
             cmd,
             cwd=cwd,
@@ -217,24 +238,27 @@ def run_command(cmd: list[str], cwd: Optional[str | Path] = None) -> str:
         )
 
         output = []
-        # Read stdout and stderr in real-time
         while True:
             stdout_line = process.stdout.readline()
             stderr_line = process.stderr.readline()
 
             if stdout_line:
-                print(stdout_line.rstrip())
+                if debug:
+                    print(stdout_line.rstrip())
                 output.append(stdout_line)
             if stderr_line:
-                print(stderr_line.rstrip(), file=sys.stderr)
+                if debug:
+                    print(stderr_line.rstrip(), file=sys.stderr)
 
             if process.poll() is not None:
                 # Get remaining lines
                 for line in process.stdout.readlines():
-                    print(line.rstrip())
+                    if debug:
+                        print(line.rstrip())
                     output.append(line)
                 for line in process.stderr.readlines():
-                    print(line.rstrip(), file=sys.stderr)
+                    if debug:
+                        print(line.rstrip(), file=sys.stderr)
                 break
 
         return_code = process.wait()
