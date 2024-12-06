@@ -1,23 +1,20 @@
+import json
 import os
 import importlib
 from pathlib import Path
-import shutil
 
 import httpx
 from pydantic import BaseModel
-import mistune
 
 API_BASE_URL = "https://api.manifold.markets"
 API_KEY = os.getenv("MANIFOLD_API_KEY")
 
 API_DOC_PATH = Path('api.md')
-MODELS_DIR = Path('pymanifold/models')
+MODELS_MODULE = 'pymanifold.models'
 
 DEPRECATED = 'deprecated'
 
-fix_me = {
-    'Username': 'UserUsername',
-}
+endpoints: dict[str, dict[str, str]] = json.load(open('endpoints.json'))
 
 
 class Session:
@@ -43,7 +40,7 @@ class Session:
         
         self.api_key = api_key
         self.endpoint = f"/{version}{endpoint}"
-        self.method = mapping.get(self.endpoint, {}).get("method")
+        self.method = endpoints.get(self.endpoint, {}).get("method")
         self.model = get_model(self.endpoint)
     
     def __repr__(self) -> str:
@@ -59,16 +56,13 @@ class Session:
 
 
 def get_model(endpoint: str) -> BaseModel:
-    model_location = MODELS_DIR / Path(mapping.get(endpoint, {}).get("model_location"))
-    model_name = model_location.stem.replace('{', '').replace('}', '').capitalize()
-    model_name = fix_me.get(model_name, model_name)
-    module_name = str(model_location).replace("/", ".").replace(".py", "")
-    print(model_name)
-    print(model_location)
-    print(module_name)
+    module_path = MODELS_MODULE + '.' + endpoints.get(endpoint, {}).get("module_path")
+    model_name = endpoints.get(endpoint, {}).get("model_name")
+    print(f"module_path: {module_path}")
+    print(f"model_name: {model_name}")
 
     try:
-        client = getattr(importlib.import_module(module_name), model_name)
+        client = getattr(importlib.import_module(module_path), model_name)
     except ModuleNotFoundError:
         raise ValueError(f"Model not found for endpoint: {endpoint}")
     
@@ -114,48 +108,10 @@ def call_manifold_api(
     return response.json()
 
 
-def create_mapping() -> dict[str, dict[str, str]]:
-    """Create a mapping of API endpoints to Pydantic model locations."""
-
-    with API_DOC_PATH.open('r', encoding='utf-8') as f:
-        api_doc = f.read()
-
-    md = mistune.markdown(api_doc, renderer='ast')
-
-    endpoints: dict[str, dict] = {}
-    for token in md:
-        if (
-            token['type'] == 'heading' and
-            token['attrs']['level'] == 3 and
-            token['children'][0]['type'] == 'codespan'
-        ):
-            if len(token['children']) > 1:
-                deprecated = token['children'][1]['raw'].lower().strip('(').strip(')').strip(' ')
-                if deprecated == DEPRECATED:
-                    continue
-            _ = token['children'][0]['raw']
-            method = _.split(' ')[0]
-            endpoint = _.split(' ')[1]
-
-            endpoints[endpoint] = {
-                'method': method,
-            }
-
-    def _file_to_endpoint(file_path: Path) -> tuple[str, dict]:
-        return (
-            '/v0/' + 
-            str(file_path).replace('.py', '').replace('{', '[').replace('}', ']')
-        )
-    for py_file in MODELS_DIR.rglob('*.py'):
-        if py_file.name == '__init__.py':
-            continue
-        relative_path = py_file.relative_to(MODELS_DIR)
-        endpoint = _file_to_endpoint(relative_path)
-        if endpoint in endpoints.keys():
-            endpoints[endpoint]['model_location'] = str(relative_path)
-
-    
-    return endpoints
 
 
-mapping = create_mapping()
+
+# mapping = create_mapping()
+
+# if __name__ == "__main__":
+#     print(mapping)
