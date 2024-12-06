@@ -2,10 +2,11 @@ import json
 import re
 from pathlib import Path
 import subprocess
-import os
 import shutil
 import logging
+import tempfile
 from typing import Dict, Optional
+import sys
 
 import mistune
 
@@ -16,7 +17,7 @@ GENERATED_SCHEMA_SCRIPT = Path("genJsonSchema.ts")
 
 DEPRECATED = "deprecated"
 MANIFOLD_REPO_URL = "https://github.com/iameskild/manifold.git"
-
+REPO_ROOT = Path(__file__).parent.parent
 
 logging.basicConfig(
     level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s"
@@ -24,22 +25,18 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 
-def make_models() -> Dict[str, Dict[str, str]]:
+def make_models(temp_dir: Path) -> Dict[str, Dict[str, str]]:
     """
     Generate Pydantic models from JSON schemas using datamodel-codegen.
 
-    Reads JSON schema files from the schemas directory and generates corresponding
-    Pydantic models in the pymanifold/models directory. Also creates a mapping of
-    API endpoints to their corresponding module paths and model names.
-
-    Returns:
-        Dict[str, Dict[str, str]]: Mapping of endpoints to their metadata including
-            module paths and endpoint methods.
+    Args:
+        temp_dir: Path to temporary directory containing schemas
     """
-    ENDPOINTS: Dict[str, Dict[str, str]] = _get_endpoints_from_api_doc()
+    ENDPOINTS: Dict[str, Dict[str, str]] = _get_endpoints_from_api_doc(temp_dir)
+    schema_dir = temp_dir / SCHEMA_INPUT
 
-    for schema_file in SCHEMA_INPUT.rglob("*.json"):
-        relative_path = schema_file.relative_to(SCHEMA_INPUT)
+    for schema_file in schema_dir.rglob("*.json"):
+        relative_path = schema_file.relative_to(schema_dir)
         module_path = relative_path.with_suffix("")
 
         # Clean up and ensure valid Python module names
@@ -47,7 +44,7 @@ def make_models() -> Dict[str, Dict[str, str]]:
         module_path_str = module_path.as_posix()
         module_path_str = re.sub(r"[^a-zA-Z0-9_/]", "_", module_path_str)
         module_path_str = module_path_str.replace("/_", "/")
-        output_path = PYDANTIC_OUTPUT / (module_path_str + ".py")
+        output_path = REPO_ROOT / PYDANTIC_OUTPUT / (module_path_str + ".py")
         output_file = str(output_path).replace("_.py", "__.py")
 
         if original_module_path_str not in ENDPOINTS.keys():
@@ -57,7 +54,10 @@ def make_models() -> Dict[str, Dict[str, str]]:
 
         # Create __init__.py files in each directory
         current_dir = output_path.parent
-        while current_dir != PYDANTIC_OUTPUT and current_dir != current_dir.parent:
+        while (
+            current_dir != (REPO_ROOT / PYDANTIC_OUTPUT)
+            and current_dir != current_dir.parent
+        ):
             init_file = current_dir / "__init__.py"
             if not init_file.exists():
                 init_file.touch()
@@ -92,53 +92,64 @@ def make_models() -> Dict[str, Dict[str, str]]:
 
         logger.info(f"Generated Pydantic model for {schema_file} at {output_file}")
 
-    with open("../pymanifold/endpoints.json", "w+", encoding="utf-8") as f:
+    with open(REPO_ROOT / "pymanifold/endpoints.json", "w+", encoding="utf-8") as f:
         json.dump(ENDPOINTS, f)
 
     return ENDPOINTS
 
 
-def clone_manifold() -> None:
+def clone_manifold(temp_dir: Path) -> None:
     """
     Perform a sparse clone of the Manifold repository.
+
+    Args:
+        temp_dir: Path to temporary directory for cloning
     """
-    if os.path.exists("manifold"):
-        logger.info("Removing existing manifold directory...")
-        shutil.rmtree("manifold")
+    if temp_dir.exists():
+        shutil.rmtree(temp_dir)
+    temp_dir.mkdir(parents=True, exist_ok=True)
+
+    manifold_dir = temp_dir / "manifold"
+    manifold_dir.mkdir(parents=True, exist_ok=True)
 
     logger.info("Initializing sparse clone of manifold repository...")
-    os.makedirs("manifold")
 
-    run_command(["git", "init"], cwd="manifold")
-    run_command(["git", "remote", "add", "origin", MANIFOLD_REPO_URL], cwd="manifold")
-    run_command(["git", "config", "core.sparseCheckout", "true"], cwd="manifold")
+    run_command(["git", "init"], cwd=manifold_dir)
+    run_command(["git", "remote", "add", "origin", MANIFOLD_REPO_URL], cwd=manifold_dir)
+    run_command(["git", "config", "core.sparseCheckout", "true"], cwd=manifold_dir)
 
-    sparse_checkout_path = os.path.join("manifold", ".git", "info", "sparse-checkout")
+    sparse_checkout_path = manifold_dir / ".git/info/sparse-checkout"
+    sparse_checkout_path.parent.mkdir(parents=True, exist_ok=True)
     with open(sparse_checkout_path, "w") as f:
         f.write("common\n")
         f.write("docs/docs/api.md\n")
-        f.write("!twitch-bot\n")
+        f.write("!twitch-bot/common\n")
 
     logger.info("Fetching required files...")
-    run_command(["git", "pull", "origin", "main"], cwd="manifold")
+    run_command(["git", "pull", "origin", "main"], cwd=manifold_dir)
     logger.info("Successfully cloned manifold repository")
 
 
-def create_json_schema() -> None:
+def create_json_schema(temp_dir: Path) -> None:
     """
     Generate JSON schema from TypeScript definitions.
 
-    Copies the schema generation script to the manifold/common directory,
-    installs required dependencies, and runs the schema generation script.
+    Args:
+        temp_dir: Path to temporary directory containing manifold clone
     """
-    dir = Path("manifold/common")
-    shutil.copy(f"scripts/{GENERATED_SCHEMA_SCRIPT}", dir)
+    common_dir = temp_dir / "manifold/common"
+    script_source = REPO_ROOT / "scripts" / GENERATED_SCHEMA_SCRIPT
+    script_dest = common_dir / GENERATED_SCHEMA_SCRIPT
+
+    shutil.copy(script_source, script_dest)
 
     logger.info("Installing required packages...")
-    run_command(["yarn", "install"], cwd=dir)
+    run_command(["yarn", "install"], cwd=common_dir)
+    run_command(["yarn", "add", "typescript"], cwd=common_dir)
+    run_command(["yarn", "add", "ts-node"], cwd=common_dir)
 
     logger.info("Generating JSON schema...")
-    run_command(["npx", "ts-node", GENERATED_SCHEMA_SCRIPT], cwd=dir)
+    run_command(["npx", "ts-node", GENERATED_SCHEMA_SCRIPT], cwd=common_dir)
     logger.info("Successfully generated JSON schema")
 
 
@@ -148,20 +159,17 @@ def _file_to_endpoint(file_path: Path) -> str:
     )
 
 
-def _get_endpoints_from_api_doc() -> Dict[str, Dict[str, str]]:
+def _get_endpoints_from_api_doc(temp_dir: Path) -> Dict[str, Dict[str, str]]:
     """
     Parse the Manifold API documentation to extract endpoint information.
 
-    Reads the API documentation markdown file and extracts endpoint paths and their
-    HTTP methods, excluding deprecated endpoints.
-
-    Returns:
-        Dict[str, Dict[str, str]]: Mapping of endpoints to their metadata
+    Args:
+        temp_dir: Path to temporary directory containing manifold clone
     """
     logger.info("Getting endpoints from API docs...")
     endpoints: Dict[str, Dict[str, str]] = {}
 
-    api_doc_path = "manifold" / API_DOC_PATH
+    api_doc_path = temp_dir / "manifold" / API_DOC_PATH
     if not api_doc_path.exists():
         raise FileNotFoundError(f"API docs not found at {api_doc_path}")
 
@@ -194,23 +202,57 @@ def _get_endpoints_from_api_doc() -> Dict[str, Dict[str, str]]:
     return endpoints
 
 
-def run_command(cmd: list[str], cwd: Optional[str] = None) -> str:
+def run_command(cmd: list[str], cwd: Optional[str | Path] = None) -> str:
     """Run a command and return its output."""
     try:
-        result = subprocess.run(
-            cmd, cwd=cwd, check=True, capture_output=True, text=True
+        # Use subprocess.Popen to get real-time output
+        process = subprocess.Popen(
+            cmd,
+            cwd=cwd,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
+            bufsize=1,
+            universal_newlines=True,
         )
-        return result.stdout
+
+        output = []
+        # Read stdout and stderr in real-time
+        while True:
+            stdout_line = process.stdout.readline()
+            stderr_line = process.stderr.readline()
+
+            if stdout_line:
+                print(stdout_line.rstrip())
+                output.append(stdout_line)
+            if stderr_line:
+                print(stderr_line.rstrip(), file=sys.stderr)
+
+            if process.poll() is not None:
+                # Get remaining lines
+                for line in process.stdout.readlines():
+                    print(line.rstrip())
+                    output.append(line)
+                for line in process.stderr.readlines():
+                    print(line.rstrip(), file=sys.stderr)
+                break
+
+        return_code = process.wait()
+        if return_code != 0:
+            raise subprocess.CalledProcessError(return_code, cmd)
+
+        return "".join(output)
     except subprocess.CalledProcessError as e:
         logger.error(f"Error running command {' '.join(cmd)}")
-        logger.error(f"Error output: {e.stderr}")
         raise
 
 
 if __name__ == "__main__":
-    logger.info("### Cloning Manifold repository ###")
-    clone_manifold()
-    logger.info("### Generating JSON schema ###")
-    create_json_schema()
-    logger.info("### Generating Pydantic models ###")
-    make_models()
+    with tempfile.TemporaryDirectory() as temp_dir:
+        temp_path = Path(temp_dir)
+        logger.info("### Cloning Manifold repository ###")
+        clone_manifold(temp_path)
+        logger.info("### Generating JSON schema ###")
+        create_json_schema(temp_path)
+        logger.info("### Generating Pydantic models ###")
+        make_models(temp_path)

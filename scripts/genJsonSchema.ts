@@ -1,4 +1,5 @@
-// This file is copied to manifold/common and run from there
+// This file is invoked by make_models.py...
+// It is copied to manifold/common and run from there
 // this generates the JSON schemas for the Manifold API found in schema.ts
 
 import * as fs from 'fs';
