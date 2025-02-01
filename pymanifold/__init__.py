@@ -13,13 +13,13 @@ load_dotenv()
 API_BASE_URL = "https://api.manifold.markets"
 API_KEY = os.getenv("MANIFOLD_API_KEY")
 
-API_DOC_PATH = Path('api.md')
-MODELS_MODULE = 'pymanifold.models'
+API_DOC_PATH = Path("api.md")
+MODELS_MODULE = "pymanifold.models"
 
-DEPRECATED = 'deprecated'
+DEPRECATED = "deprecated"
 
 CURRENT_DIR = Path(__file__).parent
-ENDPOINTS: dict[str, dict[str, str]] = json.load(open(f'{CURRENT_DIR}/endpoints.json'))
+ENDPOINTS: dict[str, dict[str, str]] = json.load(open(f"{CURRENT_DIR}/endpoints.json"))
 
 logger = logging.getLogger(__name__)
 logging.basicConfig(level=logging.INFO)
@@ -27,7 +27,7 @@ logging.basicConfig(level=logging.INFO)
 
 class Session:
     def __init__(
-        self, 
+        self,
         endpoint: str,
         version: str = "v0",
         api_key: str | None = API_KEY,
@@ -40,18 +40,18 @@ class Session:
             version: API version (default is "v0")
             api_key: Optional API key for authenticated endpoints
         """
-        if endpoint.startswith('/v0') or endpoint.startswith('v0'):
-            endpoint = endpoint.replace('/v0', '')
-        if not endpoint.startswith('/'):
-            endpoint = '/' + endpoint
+        if endpoint.startswith("/v0") or endpoint.startswith("v0"):
+            endpoint = endpoint.replace("/v0", "")
+        if not endpoint.startswith("/"):
+            endpoint = "/" + endpoint
         if version != "v0":
             raise ValueError("Only v0 is supported")
-        
+
         self.api_key = api_key
         self.endpoint = f"/{version}{endpoint}"
         self.method = ENDPOINTS.get(self.endpoint, {}).get("method")
         self.model = get_model(self.endpoint)
-    
+
     def __repr__(self) -> str:
         return f"Session(endpoint={self.endpoint})"
 
@@ -91,9 +91,9 @@ def get_model(endpoint: str) -> BaseModel:
         client = getattr(importlib.import_module(module_path), model_name)
     except ModuleNotFoundError:
         raise ValueError(f"Model not found for endpoint: {endpoint}")
-    
+
     return client
-    
+
 
 def call_manifold_api(
     endpoint: str,

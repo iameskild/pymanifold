@@ -6,7 +6,7 @@ The goal of this repo is to take the manifold.markets API and autogenerate a set
 
 Because the Manifold Markets API is still in alpha, this was the simpliest way interface I could come up with that didn't require maintaining a one-to-one mapping between the API and Python-specific objects. Under the hood, I am pulling the API schema and other information directly from the Manifold GitHub repo (see `scripts/make_models.py` for more details) so if their API gets an update, all I need to do I regenerate the models.
 
-> pymanifold already exists on PyPI so a new name is likely needed. 
+> pymanifold already exists on PyPI so a new name is likely needed.
 
 This project is distributed under the terms of the [MIT](https://spdx.org/licenses/MIT.html) license.
 
