@@ -86,13 +86,14 @@ def make_models(temp_dir: Path) -> Dict[str, Dict[str, str]]:
         model_name = (
             module_path_str.replace("/", "_").replace("_", " ").title().replace(" ", "")
         )
+        # Store only the relative module path after models/
         module_path = (
-            output_file.replace(".py", "")
-            .replace("pymanifold/models/", "")
+            output_file.replace(str(REPO_ROOT / PYDANTIC_OUTPUT / ""), "")
+            .replace(".py", "")
             .replace("/", ".")
         )
 
-        ENDPOINTS[original_module_path_str]["module_path"] = str(module_path)
+        ENDPOINTS[original_module_path_str]["module_path"] = module_path
         ENDPOINTS[original_module_path_str]["model_name"] = model_name
 
         logger.info(f"Generated Pydantic model for {schema_file} at {output_file}")
@@ -268,7 +269,7 @@ def run_command(
         return "".join(output)
     except subprocess.CalledProcessError as e:
         logger.error(f"Error running command {' '.join(cmd)}")
-        raise
+        raise e
 
 
 if __name__ == "__main__":

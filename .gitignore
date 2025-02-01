@@ -72,7 +72,5 @@ db.sqlite3-journal
 .dmypy.json
 dmypy.json
 
-
-# Manifold
-manifold/
-schemas/
+# .env
+.env

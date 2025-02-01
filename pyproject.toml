@@ -29,6 +29,9 @@ classifiers = [
 ]
 dependencies = [
   "pydantic",
+  "httpx",
+  "python-dotenv",
+  "datamodel-codegen",
 ]
 
 [project.urls]

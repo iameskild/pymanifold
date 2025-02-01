@@ -2,9 +2,13 @@ import json
 import os
 import importlib
 from pathlib import Path
+import logging
 
 import httpx
+from dotenv import load_dotenv
 from pydantic import BaseModel
+
+load_dotenv()
 
 API_BASE_URL = "https://api.manifold.markets"
 API_KEY = os.getenv("MANIFOLD_API_KEY")
@@ -14,11 +18,16 @@ MODELS_MODULE = 'pymanifold.models'
 
 DEPRECATED = 'deprecated'
 
-endpoints: dict[str, dict[str, str]] = json.load(open('endpoints.json'))
+CURRENT_DIR = Path(__file__).parent
+ENDPOINTS: dict[str, dict[str, str]] = json.load(open(f'{CURRENT_DIR}/endpoints.json'))
+
+logger = logging.getLogger(__name__)
+logging.basicConfig(level=logging.INFO)
 
 
 class Session:
-    def __init__(self, 
+    def __init__(
+        self, 
         endpoint: str,
         version: str = "v0",
         api_key: str | None = API_KEY,
@@ -40,26 +49,43 @@ class Session:
         
         self.api_key = api_key
         self.endpoint = f"/{version}{endpoint}"
-        self.method = endpoints.get(self.endpoint, {}).get("method")
+        self.method = ENDPOINTS.get(self.endpoint, {}).get("method")
         self.model = get_model(self.endpoint)
     
     def __repr__(self) -> str:
         return f"Session(endpoint={self.endpoint})"
 
-    def call_api(self) -> dict:
+    def execute(
+        self,
+        url_params: dict | None = None,
+        params: dict | None = None,
+        json_data: dict | None = None,
+    ) -> dict:
+        """
+        Execute the session.
+
+        Args:
+            url_params: URL parameters to replace in the endpoint (eg. {"username": "johndoe"} for "/v0/user/[username]")
+            params: Query parameters to pass to the API
+            json_data: JSON data to pass to the API
+        """
+        if url_params:
+            for url_param, value in url_params.items():
+                self.endpoint = self.endpoint.replace(f"[{url_param}]", value)
         return call_manifold_api(
             self.endpoint,
             method=self.method,
-            # json_data=self.model.model_dump(),
+            params=params,
+            json_data=json_data,
             api_key=self.api_key,
         )
 
 
 def get_model(endpoint: str) -> BaseModel:
-    module_path = MODELS_MODULE + '.' + endpoints.get(endpoint, {}).get("module_path")
-    model_name = endpoints.get(endpoint, {}).get("model_name")
-    print(f"module_path: {module_path}")
-    print(f"model_name: {model_name}")
+    module_path = MODELS_MODULE + ENDPOINTS.get(endpoint, {}).get("module_path")
+    model_name = ENDPOINTS.get(endpoint, {}).get("model_name")
+    logger.info(f"module_path: {module_path}")
+    logger.info(f"model_name: {model_name}")
 
     try:
         client = getattr(importlib.import_module(module_path), model_name)
@@ -78,8 +104,10 @@ def call_manifold_api(
 ) -> dict:
     """Make a request to the Manifold Markets API.
 
+    Used by the Session.execute() method but made available for direct use.
+
     Args:
-        endpoint: API endpoint path (e.g. "/bet")
+        endpoint: API endpoint path (e.g. "/v0/me")
         method: HTTP method to use ("GET", "POST", etc)
         params: Optional query parameters
         json_data: Optional JSON data for POST/PUT requests
@@ -106,12 +134,3 @@ def call_manifold_api(
     )
     response.raise_for_status()
     return response.json()
-
-
-
-
-
-# mapping = create_mapping()
-
-# if __name__ == "__main__":
-#     print(mapping)
