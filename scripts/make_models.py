@@ -22,12 +22,49 @@ MANIFOLD_REPO_URL = "https://github.com/iameskild/manifold.git"
 
 DEBUG = os.getenv("DEBUG", "").lower() == "true"
 
+ENDPOINT_VARIATIONS = {
+    # Original -> Variations
+    "marketId": ["id", "contractId"],
+    "marketSlug": ["slug"],
+}
 
 logging.basicConfig(
     level=logging.DEBUG if DEBUG else logging.INFO,
     format="%(asctime)s - %(levelname)s - %(message)s",
 )
 logger = logging.getLogger(__name__)
+
+
+def _normalize_endpoint(endpoint: str) -> list[str]:
+    """
+    Generate all possible variations of an endpoint.
+
+    Args:
+        endpoint: Original endpoint string
+
+    Returns:
+        List of possible endpoint variations
+    """
+    variations = [endpoint]
+
+    for original, replacements in ENDPOINT_VARIATIONS.items():
+        for replacement in replacements:
+            # Create new variations by replacing each occurrence
+            new_variations = []
+            for variant in variations:
+                if original in variant:
+                    new_variations.append(variant.replace(original, replacement))
+            variations.extend(new_variations)
+
+    return list(set(variations))  # Remove duplicates
+
+
+def _file_to_endpoint(file_path: Path) -> str:
+    """Convert file path to endpoint format with all possible variations."""
+    base_endpoint = "/v0/" + str(file_path).replace(".py", "").replace(
+        "{", "["
+    ).replace("}", "]")
+    return base_endpoint
 
 
 def make_models(temp_dir: Path) -> Dict[str, Dict[str, str]]:
@@ -40,20 +77,32 @@ def make_models(temp_dir: Path) -> Dict[str, Dict[str, str]]:
     ENDPOINTS: Dict[str, Dict[str, str]] = _get_endpoints_from_api_doc(temp_dir)
     schema_dir = temp_dir / SCHEMA_INPUT
 
+    # Create a reverse mapping of all possible variations to their original endpoints
+    variation_map = {}
+    for endpoint, data in ENDPOINTS.items():
+        variations = _normalize_endpoint(endpoint)
+        for variant in variations:
+            variation_map[variant] = endpoint
+
     for schema_file in schema_dir.rglob("*.json"):
         relative_path = schema_file.relative_to(schema_dir)
         module_path = relative_path.with_suffix("")
+        print(module_path)
+
+        # Get the endpoint from file path and check all its variations
+        file_endpoint = _file_to_endpoint(module_path)
+        original_endpoint = variation_map.get(file_endpoint)
+
+        if not original_endpoint:
+            logger.debug(f"No matching endpoint found for schema: {file_endpoint}")
+            continue
 
         # Clean up and ensure valid Python module names
-        original_module_path_str = _file_to_endpoint(module_path)
         module_path_str = module_path.as_posix()
         module_path_str = re.sub(r"[^a-zA-Z0-9_/]", "_", module_path_str)
         module_path_str = module_path_str.replace("/_", "/")
         output_path = REPO_ROOT / PYDANTIC_OUTPUT / (module_path_str + ".py")
         output_file = str(output_path).replace("_.py", "__.py")
-
-        if original_module_path_str not in ENDPOINTS.keys():
-            continue
 
         output_path.parent.mkdir(parents=True, exist_ok=True)
 
@@ -86,15 +135,14 @@ def make_models(temp_dir: Path) -> Dict[str, Dict[str, str]]:
         model_name = (
             module_path_str.replace("/", "_").replace("_", " ").title().replace(" ", "")
         )
-        # Store only the relative module path after models/
         module_path = (
             output_file.replace(str(REPO_ROOT / PYDANTIC_OUTPUT / ""), "")
             .replace(".py", "")
             .replace("/", ".")
         )
 
-        ENDPOINTS[original_module_path_str]["module_path"] = module_path
-        ENDPOINTS[original_module_path_str]["model_name"] = model_name
+        ENDPOINTS[original_endpoint]["module_path"] = module_path
+        ENDPOINTS[original_endpoint]["model_name"] = model_name
 
         logger.info(f"Generated Pydantic model for {schema_file} at {output_file}")
 
@@ -165,12 +213,6 @@ def create_json_schema(temp_dir: Path) -> None:
         ["npx", "ts-node", GENERATED_SCHEMA_SCRIPT], cwd=common_dir, debug=DEBUG
     )
     logger.info("Successfully generated JSON schema")
-
-
-def _file_to_endpoint(file_path: Path) -> str:
-    return "/v0/" + str(file_path).replace(".py", "").replace("{", "[").replace(
-        "}", "]"
-    )
 
 
 def _get_endpoints_from_api_doc(temp_dir: Path) -> Dict[str, Dict[str, str]]:
