@@ -31,7 +31,7 @@ dependencies = [
   "pydantic",
   "httpx",
   "python-dotenv",
-  "datamodel-codegen",
+  "datamodel-code-generator",
 ]
 
 [project.urls]
