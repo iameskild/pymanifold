@@ -23,8 +23,6 @@ Add your API key to the newly created `.env` file.
 pip install .
 ```
 
-> This will build the package and generate the models and `endpoints.json` file.
-
 3. To interact with the API, please use the `Session` object.
 
 ```python

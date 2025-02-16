@@ -1,0 +1,186 @@
+{
+    "/v0/user/[username]": {
+        "method": "GET",
+        "module_path": ".user.username__",
+        "model_name": "UserUsername"
+    },
+    "/v0/user/[username]/lite": {
+        "method": "GET",
+        "module_path": ".user.username_.lite",
+        "model_name": "UserUsernameLite"
+    },
+    "/v0/user/by-id/[id]": {
+        "method": "GET",
+        "module_path": ".user.by_id.id__",
+        "model_name": "UserByIdId"
+    },
+    "/v0/user/by-id/[id]/lite": {
+        "method": "GET",
+        "module_path": ".user.by_id.id_.lite",
+        "model_name": "UserByIdIdLite"
+    },
+    "/v0/me": {
+        "method": "GET",
+        "module_path": ".me",
+        "model_name": "Me"
+    },
+    "/v0/user/[username]/bets": {
+        "method": "GET",
+        "module_path": ".user.username_.bets",
+        "model_name": "UserUsernameBets"
+    },
+    "/v0/groups": {
+        "method": "GET",
+        "module_path": ".groups",
+        "model_name": "Groups"
+    },
+    "/v0/group/[slug]": {
+        "method": "GET",
+        "module_path": ".group.slug__",
+        "model_name": "GroupSlug"
+    },
+    "/v0/group/by-id/[id]": {
+        "method": "GET",
+        "module_path": ".group.by_id.id__",
+        "model_name": "GroupByIdId"
+    },
+    "/v0/group/by-id/[id]/markets": {
+        "method": "GET",
+        "module_path": ".group.by_id.id_.markets",
+        "model_name": "GroupByIdIdMarkets"
+    },
+    "/v0/markets": {
+        "method": "GET",
+        "module_path": ".markets",
+        "model_name": "Markets"
+    },
+    "/v0/market/[marketId]": {
+        "method": "GET",
+        "module_path": ".market.id__",
+        "model_name": "MarketId"
+    },
+    "/v0/market/[marketId]/positions": {
+        "method": "GET",
+        "module_path": ".market.id_.positions",
+        "model_name": "MarketIdPositions"
+    },
+    "/v0/slug/[marketSlug]": {
+        "method": "GET",
+        "module_path": ".slug.slug__",
+        "model_name": "SlugSlug"
+    },
+    "/v0/search-markets": {
+        "method": "GET",
+        "module_path": ".search_markets",
+        "model_name": "SearchMarkets"
+    },
+    "/v0/users": {
+        "method": "GET",
+        "module_path": ".users",
+        "model_name": "Users"
+    },
+    "/v0/bet": {
+        "method": "POST",
+        "module_path": ".bet",
+        "model_name": "Bet"
+    },
+    "/v0/bet/cancel/[id]": {
+        "method": "POST"
+    },
+    "/v0/market": {
+        "method": "POST",
+        "module_path": ".market",
+        "model_name": "Market"
+    },
+    "/v0/market/[marketId]/answer": {
+        "method": "POST",
+        "module_path": ".market.contractId_.answer",
+        "model_name": "MarketContractidAnswer"
+    },
+    "/v0/market/[marketId]/add-liquidity": {
+        "method": "POST",
+        "module_path": ".market.contractId_.add_liquidity",
+        "model_name": "MarketContractidAddLiquidity"
+    },
+    "/v0/market/[marketId]/add-bounty": {
+        "method": "POST",
+        "module_path": ".market.contractId_.add_bounty",
+        "model_name": "MarketContractidAddBounty"
+    },
+    "/v0/market/[marketId]/award-bounty": {
+        "method": "POST",
+        "module_path": ".market.contractId_.award_bounty",
+        "model_name": "MarketContractidAwardBounty"
+    },
+    "/v0/market/[marketId]/close": {
+        "method": "POST",
+        "module_path": ".market.contractId_.close",
+        "model_name": "MarketContractidClose"
+    },
+    "/v0/market/[marketId]/group": {
+        "method": "POST",
+        "module_path": ".market.contractId_.group",
+        "model_name": "MarketContractidGroup"
+    },
+    "/v0/market/[marketId]/resolve": {
+        "method": "POST",
+        "module_path": ".market.contractId_.resolve",
+        "model_name": "MarketContractidResolve"
+    },
+    "/v0/market/[marketId]/sell": {
+        "method": "POST",
+        "module_path": ".market.contractId_.sell",
+        "model_name": "MarketContractidSell"
+    },
+    "/v0/comment": {
+        "method": "POST",
+        "module_path": ".comment",
+        "model_name": "Comment"
+    },
+    "/v0/comments": {
+        "method": "GET",
+        "module_path": ".comments",
+        "model_name": "Comments"
+    },
+    "/v0/bets": {
+        "method": "GET",
+        "module_path": ".bets",
+        "model_name": "Bets"
+    },
+    "/v0/managrams": {
+        "method": "GET",
+        "module_path": ".managrams",
+        "model_name": "Managrams"
+    },
+    "/v0/managram": {
+        "method": "POST",
+        "module_path": ".managram",
+        "model_name": "Managram"
+    },
+    "/v0/leagues": {
+        "method": "GET",
+        "module_path": ".leagues",
+        "model_name": "Leagues"
+    },
+    "/v0/get-lovers": {
+        "method": "GET",
+        "module_path": ".get_lovers",
+        "model_name": "GetLovers"
+    },
+    "/v0/get-lover-answers?userId=[user_id]": {
+        "method": "GET"
+    },
+    "/v0/txns": {
+        "method": "GET",
+        "module_path": ".txns",
+        "model_name": "Txns"
+    },
+    "/v0/get-compatibility-questions": {
+        "method": "GET",
+        "module_path": ".get_compatibility_questions",
+        "model_name": "GetCompatibilityQuestions"
+    },
+    "/unresolve": {
+        "method": "POST"
+    }
+}
